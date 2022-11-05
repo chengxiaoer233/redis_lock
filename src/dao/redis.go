@@ -2,17 +2,16 @@ package dao
 
 import (
 	"context"
-	"github.com/go-redis/redis/v9"
 	"fmt"
+	"github.com/go-redis/redis/v9"
 )
 
 var ctx = context.Background()
 
 type Redis struct {
-
 }
 
-func (r *Redis) NewClient() *redis.Client{
+func (r *Redis) NewClient() *redis.Client {
 
 	rdb := redis.NewClient(&redis.Options{
 		Addr:     "localhost:6379",
