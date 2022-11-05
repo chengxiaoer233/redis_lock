@@ -16,35 +16,23 @@ func init () {
 }
 
 // 最简单的加锁和解锁
-func Lock(ctx context.Context, key string, val string, timeout time.Duration)(err error){
+func Lock(ctx context.Context, key string, val string, timeout time.Duration)(ok bool, err error){
 
-	ok ,err := client.SetNX(ctx, key, val, timeout).Result()
+	ok ,err = client.SetNX(ctx, key, val, timeout).Result()
 	if err != nil {
 		fmt.Println("SetNX 错误，err=",err)
-		return err
-	}
-
-	if ok{
-		fmt.Println("加分布式锁成功")
-	}else{
-		fmt.Println("加分布式锁失败")
+		return ok, err
 	}
 
 	return
 }
 
-func Unlock(ctx context.Context,key string)(err error){
+func Unlock(ctx context.Context,key string)(val int64, err error){
 
-	val ,err := client.Del(ctx,key).Result()
+	val ,err = client.Del(ctx,key).Result()
 	if err != nil {
 		fmt.Println("解锁失败，err=",err)
 		return
-	}
-
-	if val == 1{
-		fmt.Println("解锁成功")
-	}else{
-		fmt.Println("解锁失败")
 	}
 
 	return
