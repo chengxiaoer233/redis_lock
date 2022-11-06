@@ -403,3 +403,126 @@ func V2LockTest(ctx context.Context) {
         ```
 * 存在的问题 
     + （1）删除锁的时候，先判断锁是否存在，再删除，非原子操作，还是会删除别人的锁     
+   
+#### 版本三：释放分布式锁的时候，使用lua脚本,实现原子操作
+* lua + redis  可以解决redis中的原子操作问题  
+
+* 释放分布式锁
+
+    + 直接调用lua脚本，先判断锁是否是自己的，如果是则删除，否则退出
+    ```go
+    // 释放分布式锁
+    // 需要用加锁返回的实体才可以调用
+    func (l *Lock) V3Unlock(ctx context.Context, luaUnlock string)(int64, error){
+    
+    	// 执行lua脚本，原子操作，根据返回的值做不同的处理逻辑
+    	val, err := l.client.Eval(ctx,luaUnlock,[]string{l.key},l.val).Int64()
+    	if err != nil {
+    		fmt.Println("l.client.Eval err=",err)
+    		return val,err
+    	}
+    
+    	// val返回0时表示key不存在或者key对应的val值不对
+    	return val,err
+    }
+    ```  
+    
+    + lua脚本释放分布式锁
+    ```lua
+   -- redis.call() 从lua脚本中调用redis方法
+   
+   -- KEYS[1]，表示输如的第一个key
+   -- ARGV[1]，为输入的第一个参数
+   
+   if redis.call("get", KEYS[1]) == ARGV[1]
+   then
+       -- 相等则执行删除动作，并返回执行删除后的结果
+       return redis.call("del", KEYS[1])
+   else
+       -- 返回0表示key不存在，或者key对应的val值已经被修改了
+       return 0
+   end
+    ```  
+* main函数
+```go
+package main
+
+import (
+	"context"
+	"fmt"
+	"github.com/google/uuid"
+	"redis_lock/dao"
+	lock "redis_lock/server"
+	"time"
+	_ "embed"
+)
+
+var (
+	// 解释：通过go:embed命令，将unlock.lua中的内容格式化赋予到luaUnlock（string类型）
+	// 注意：（1）go embed 只能嵌入当前目录或者子目录，不能嵌入上一级目录
+	//      （2）go embed 不能再函数内部定义，需要再func 外面定义
+
+	//go:embed lua/unlock.lua
+	luaUnlock string
+)
+
+func main() {
+
+	ctx := context.Background()
+	for i := 0; i < 5; i++ {
+
+		go func() {
+			V3LockTest(ctx)
+		}()
+	}
+
+	time.Sleep(1 * time.Hour)
+}
+
+// v3 采用lua脚本来实现分布式锁的解锁
+func V3LockTest(ctx context.Context) {
+
+	// 生成一个redis的client
+	c := new(dao.Redis)
+	redisClient := c.NewClient()
+
+	// 生成一个 Cmdable client，这里也是可以传入redis.ClusterClient的
+	cClient := lock.NewClient(redisClient)
+
+	key := "test3"
+	// vale这里不能再随意设置，需要为uuid,后面删除的时候，需要对比此值是否一致，是则可以删除，否则不行
+	val := uuid.New().String()
+	timeout := time.Second * 60
+
+	// 加锁,会返回一个lock实体和加锁函数对应的日志
+	lock,ok, err := cClient.V3Lock(ctx, key, val, timeout)
+	if err != nil {
+		fmt.Println("cClient.V2Lock err=", err)
+		return
+	}
+
+	if !ok {
+		fmt.Println("分布式锁已经被占用")
+		return
+	}
+
+	// 模拟业务功能
+	fmt.Println("分布式锁加锁成功")
+	time.Sleep(time.Second * 30)
+
+	// 释放分布式锁,通过lock返回的实体才可以删除，不能随意调用
+	res, err := lock.V3Unlock(ctx,luaUnlock)
+	if err != nil {
+		fmt.Println("lock.Lock 解锁失败，err=", err)
+		return
+	}
+
+	if res != 1 {
+		fmt.Println("分布式锁解锁失败，err=", err)
+		return
+	}
+
+	fmt.Println("分布式锁解锁成功")
+}
+```  
+    
