@@ -339,7 +339,7 @@ func V2LockTest(ctx context.Context) {
       分布式锁已经被占用
     ```
     
-    + 加锁后，通过在终端手动删除key
+    + 加锁后，通过在终端手动删除key（模拟锁被别人删除了）
         
         + 获取锁成功
         
@@ -368,7 +368,7 @@ func V2LockTest(ctx context.Context) {
           lock.Lock 解锁失败，err= redis key is nil
         ```
     
-    + 加锁后，通过在终端手动修改key对应的val值
+    + 加锁后，通过在终端手动修改key对应的val值（模拟锁被别人重新获取）
                 
         + 获取锁成功
         
@@ -401,3 +401,5 @@ func V2LockTest(ctx context.Context) {
           分布式锁已被重新获取，不执行删除
           lock.Lock 解锁失败，err= 分布式锁已被重新获取，不执行删除
         ```
+* 存在的问题 
+    + （1）删除锁的时候，先判断锁是否存在，再删除，非原子操作，还是会删除别人的锁     
