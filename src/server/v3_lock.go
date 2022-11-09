@@ -21,23 +21,23 @@ func (c *Client) V3Lock(ctx context.Context, key string, val string, timeout tim
 
 	return &Lock{
 			client: c.client,
-			key: key,
-			val: val,
+			key:    key,
+			val:    val,
 		},
-		ok,err
+		ok, err
 }
 
 // 释放分布式锁
 // 需要用加锁返回的实体才可以调用
-func (l *Lock) V3Unlock(ctx context.Context, luaUnlock string)(int64, error){
+func (l *Lock) V3Unlock(ctx context.Context, luaUnlock string) (int64, error) {
 
 	// 执行lua脚本，原子操作，根据返回的值做不同的处理逻辑
-	val, err := l.client.Eval(ctx,luaUnlock,[]string{l.key},l.val).Int64()
+	val, err := l.client.Eval(ctx, luaUnlock, []string{l.key}, l.val).Int64()
 	if err != nil {
-		fmt.Println("l.client.Eval err=",err)
-		return val,err
+		fmt.Println("l.client.Eval err=", err)
+		return val, err
 	}
 
 	// val返回0时表示key不存在或者key对应的val值不对
-	return val,err
+	return val, err
 }

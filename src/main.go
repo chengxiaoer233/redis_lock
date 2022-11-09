@@ -2,12 +2,12 @@ package main
 
 import (
 	"context"
+	_ "embed"
 	"fmt"
 	"github.com/google/uuid"
 	"redis_lock/dao"
 	lock "redis_lock/server"
 	"time"
-	_ "embed"
 )
 
 var (
@@ -96,7 +96,7 @@ func V2LockTest(ctx context.Context) {
 	timeout := time.Second * 60
 
 	// 加锁,会返回一个lock实体和加锁函数对应的日志
-	lock,ok, err := cClient.V2Lock(ctx, key, val, timeout)
+	lock, ok, err := cClient.V2Lock(ctx, key, val, timeout)
 	if err != nil {
 		fmt.Println("cClient.V2Lock err=", err)
 		return
@@ -142,7 +142,7 @@ func V3LockTest(ctx context.Context) {
 	timeout := time.Second * 60
 
 	// 加锁,会返回一个lock实体和加锁函数对应的日志
-	lock,ok, err := cClient.V3Lock(ctx, key, val, timeout)
+	lock, ok, err := cClient.V3Lock(ctx, key, val, timeout)
 	if err != nil {
 		fmt.Println("cClient.V2Lock err=", err)
 		return
@@ -158,7 +158,7 @@ func V3LockTest(ctx context.Context) {
 	time.Sleep(time.Second * 30)
 
 	// 释放分布式锁,通过lock返回的实体才可以删除，不能随意调用
-	res, err := lock.V3Unlock(ctx,luaUnlock)
+	res, err := lock.V3Unlock(ctx, luaUnlock)
 	if err != nil {
 		fmt.Println("lock.Lock 解锁失败，err=", err)
 		return
