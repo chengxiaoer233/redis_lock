@@ -526,6 +526,40 @@ func V3LockTest(ctx context.Context) {
 }
 ```  
 
+#### 版本四：在v3的基础上增加手动续约机制，用户可以手动针对key续约
+* refresh函数
+```go
+    // 手动续约，执行refresh lua脚本
+    // 本质就是针对某个key重新设置过期时间
+
+    func (l *Lock) refresh(ctx context.Context, luaRefresh string) error {
+    
+    	res, err := l.client.Eval(ctx,luaRefresh,[]string{l.key},l.val,l.expiration.Seconds()).Int64()
+    	if err != nil {
+    		return err
+    	}
+    
+    	if res != 1 {
+    		fmt.Println("获取分布式锁失败")
+    	}
+    
+    	return nil
+    }
+```
+
+* refresh.lua函数
+```lua
+    -- 先检测key对应的val是否和设置的一样
+    -- 不一样退出，一样则调用expire函数
+
+    if redis.call("get", KEYS[1]) == ARGV[1]
+    then
+        return redis.call("expire", KEYS[1], ARGV[2])
+    else
+        return 0 
+    end
+```
+
 
 #### 常见问题
 * （1）加锁的时候为什么需要设置超时时间？  
