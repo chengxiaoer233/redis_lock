@@ -16,6 +16,7 @@ type Lock struct {
 	client redis.Cmdable
 	key string
 	val string
+	expiration time.Duration
 }
 
 // 获取分布式锁，设置的key为一个uuid，不是随意值

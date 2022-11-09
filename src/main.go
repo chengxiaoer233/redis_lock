@@ -17,6 +17,9 @@ var (
 
 	//go:embed lua/unlock.lua
 	luaUnlock string
+
+	//go:embed lua/refresh.lua
+	luaRefresh string
 )
 
 func main() {
