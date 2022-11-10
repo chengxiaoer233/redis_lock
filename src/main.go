@@ -21,7 +21,8 @@ var (
 	//go:embed lua/refresh.lua
 	luaRefresh string
 
-
+	//go:embed lua/lock.lua
+	luaLock string
 )
 
 func main() {
