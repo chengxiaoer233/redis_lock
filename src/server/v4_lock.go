@@ -62,3 +62,54 @@ func (l *Lock) refresh(ctx context.Context, luaRefresh string) error {
 
 	return nil
 }
+
+// 手动续约,增加最大续约次数，和续约间隔
+func (l *Lock) timeToRefresh(tryLockCount int, interval time.Duration, luaRefresh string) {
+
+	// 初始化一个chan，用户接受业务退出信号
+	end := make(chan struct{}, 1)
+
+	// 启动一个协程去执行续约任务
+	go func() {
+
+		tmpCount := 0
+		ticker := time.NewTicker(time.Second * interval)
+		for {
+			select {
+			case <-ticker.C: // 定时时间到，需要续约
+				{
+					tmpCount++ // 续约次数加一，超过最大续约次数就退出
+					if tmpCount > tryLockCount {
+						return
+					}
+
+					ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+					err := l.refresh(ctx, luaRefresh)
+					cancel()
+
+					// 错误处理
+					if err == context.DeadlineExceeded {
+						// 超时，按照道理来说，你应该立刻重试
+						// 超时之下可能续约成功了，也可能没成功
+					}
+
+					if err != nil && err != context.DeadlineExceeded {
+						// 其它错误，你要考虑这个错误能不能继续处理
+						// 如果不能处理，你怎么通知后续业务中断？
+					}
+				}
+			case <-end: // 业务主动退出了
+				{
+					fmt.Printf("业务主动退出了")
+					return
+				}
+			}
+		}
+	}()
+
+	// 这里模拟业务逻辑
+	time.Sleep(30 * time.Second)
+
+	// 业务结束
+	end <- struct{}{} // 发送结束信号
+}

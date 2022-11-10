@@ -560,6 +560,59 @@ func V3LockTest(ctx context.Context) {
     end
 ```
 
+* 在手动续约的基础上，增加最大续约次数和自动以时间间隔
+```go
+// 手动续约,最大续约次数，和续约间隔
+func (l *Lock) timeToRefresh(tryLockCount int, interval time.Duration, luaRefresh string) {
+
+	// 初始化一个chan，用户接受业务退出信号
+	end := make(chan struct{},1)
+
+	// 启动一个协程去执行续约任务
+	go func (){
+
+		tmpCount := 0
+		ticker := time.NewTicker(time.Second * interval)
+		for {
+			select {
+			case <-ticker.C: // 定时时间到，需要续约
+				{
+					tmpCount++ // 续约次数加一，超过最大续约次数就退出
+					if tmpCount > tryLockCount {
+						return
+					}
+
+					ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+					err := l.refresh(ctx, luaRefresh)
+					cancel()
+
+					// 错误处理
+					if err == context.DeadlineExceeded {
+						// 超时，按照道理来说，你应该立刻重试
+						// 超时之下可能续约成功了，也可能没成功
+					}
+
+					if err != nil && err != context.DeadlineExceeded {
+						// 其它错误，你要考虑这个错误能不能继续处理
+						// 如果不能处理，你怎么通知后续业务中断？
+					}
+				}
+			case <- end : // 业务主动退出了
+				{
+					fmt.Printf("业务主动退出了")
+					return
+				}
+			}
+		}
+	}()
+
+	// 这里模拟业务逻辑
+	time.Sleep(30 * time.Second)
+
+	// 业务结束
+	end <- struct{}{} // 发送结束信号
+}
+```
 
 #### 常见问题
 * （1）加锁的时候为什么需要设置超时时间？  
@@ -596,12 +649,17 @@ func V3LockTest(ctx context.Context) {
 
 * （7）手动续约的问题？  
     + （1）多久续约一次 ？
-        手动续约不必要把时间设置过长，因为有续约机制，同时为了避免实例
+        手动续约不必把过期时间设置过长，因为有续约机制，同时为了避免实例
         崩溃其他实例拿不到锁问题
         
     + （2）续约如果出现了问题，改怎么办 ？  
             + 超时error ？
+                + 超时之下可能续约成功了，也可能没成功    
+                + 重试几次，同时做好监控上报
+                
             + 其他服务器error怎么办 ？
+                + 要看业务场景，能不能继续处理，不能则发信号程序退出，同时回滚业务
+            
     + （3）如果确认续约失败了，业务要怎么处理 ？
         无解，除非手动检测分布式锁，不然没有办法        
         
