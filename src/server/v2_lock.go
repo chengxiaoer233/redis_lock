@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/go-redis/redis/v9"
+	"sync"
 	"time"
 )
 
@@ -17,6 +18,8 @@ type Lock struct {
 	key        string
 	val        string
 	expiration time.Duration
+	unlock     chan struct{}
+	signalUnlockOnce sync.Once
 }
 
 // 获取分布式锁，设置的key为一个uuid，不是随意值
